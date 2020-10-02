@@ -1,0 +1,41 @@
+{
+    "name": "volumnet/raas-cms-russianpost",
+    "description": "Russian post adapter for RAAS4.CMS",
+    "type": "library",
+    "license": "GPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "Alex V. Surnin",
+            "email": "info@volumnet.ru"
+        }
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "volumnet/raas.cms": "^4.2",
+        "volumnet/raas.cms.shop": "^4.2"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^5.3",
+        "volumnet/raas.kernel": "^4.2",
+        "volumnet/raas.cms": "^4.2",
+        "volumnet/raas.cms.shop": "^4.2"
+    },
+    "scripts": {
+        "test": [
+            "CHCP 65001",
+            "phpunit --coverage-html tests/coverage"
+        ]
+    },
+    "autoload": {
+        "psr-4": {
+            "RAAS\\CMS\\RussianPost\\": "src/"
+        }
+    },
+    "repositories": [
+        {
+            "type": "composer",
+            "url": "https://asset-packagist.org"
+        }
+    ]
+}
