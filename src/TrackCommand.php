@@ -29,7 +29,8 @@ use RAAS\CMS\Shop\Order_History;
  *         'ignoreOpCodes' ?=> string|string[] Исключенные статусы отслеживания
  *                                             (в таком же виде),
  *         'statusId' => int ID# статуса заказа, который установим,
- *                           если встретится заданный статус отслеживания
+ *                           если встретится заданный статус отслеживания,
+ *         'includeAddress' => bool Включать в статус адрес,
  *     ]>,
  *     'finalStatuses' => int[] ID# финальных статусов заказов
  *                              (заказы с такими статусами не отслеживаются),
@@ -61,10 +62,12 @@ class TrackCommand extends Command
                 'opCodes' => 2,
                 'ignoreOpCodes' => ['2.2'],
                 'statusId' => 2,
+                'includeAddress' => false,
             ],
             [
                 'opCodes' => '2.2',
                 'statusId' => 3,
+                'includeAddress' => false
             ],
         ],
         'finalStatuses' => [2, 3],
@@ -284,13 +287,18 @@ class TrackCommand extends Command
             if ($operAttr->Id) {
                 $code .= '.' . $operAttr->Id;
             }
-            $statusId = $this->getHistoryStatus($code);
-            if (!$statusId) {
+            $trackOpConfig = $this->getHistoryOperationConfig($code);
+            if (!$trackOpConfig) {
                 continue;
             }
+            $statusId = $trackOpConfig['statusId'];
             $description = trim($operType->Name);
             if ($operAttr->Name) {
                 $description .= ' / ' . $operAttr->Name;
+            }
+            if ($trackOpConfig['includeAddress']) {
+                $address = $operationHistoryEntry->AddressParameters->OperationAddress;
+                $description .= ' / ' . $address->Index . ' ' . $address->Description;
             }
             $dateText = $operationParameters->OperDate;
             $time = strtotime($dateText);
@@ -308,11 +316,14 @@ class TrackCommand extends Command
 
 
     /**
-     * Получает ID# статуса заказа по коду операции
-     * @param int|string $opCode
-     * @return int|null null, если не найдена
+     * Получает соответствующую настройку смены статуса по коду операции
+     * @param int|string $opCode Код операции
+     * @return array|null <pre>[
+     *     'statusId' => int ID# статуса,
+     *     'includeAddress' => bool Включать в событие истории адрес
+     * ]</pre> или null, если не найдена
      */
-    public function getHistoryStatus($opCode)
+    public function getHistoryOperationConfig($opCode)
     {
         foreach ($this->config['trackOperations'] as $operationParam) {
             $opCodes = (array)$operationParam['opCodes'];
@@ -324,7 +335,7 @@ class TrackCommand extends Command
             }
             foreach ($opCodes as $opCodeTemplate) {
                 if ($this->codeMatches($opCodeTemplate, $opCode)) {
-                    return $operationParam['statusId'];
+                    return $operationParam;
                 }
             }
         }
@@ -369,14 +380,18 @@ class TrackCommand extends Command
      */
     public function getChangeData(Order $order, array $operationHistory = [])
     {
-        $result = [];
+        $result = ['history' => []];
         $orderHistory = $order->history;
-        usort($orderHistory, function ($a, $b) {
-            return strtotime($b->post_date) - strtotime($a->post_date);
-        }); // Отсортируем историю заказа по убыванию времени
-        usort($operationHistory, function ($a, $b) {
-            return $b['time'] - $a['time'];
-        }); // Отсортируем историю отправления по убыванию времени
+        if ($orderHistory) {
+            usort($orderHistory, function ($a, $b) {
+                return strtotime($b->post_date) - strtotime($a->post_date);
+            }); // Отсортируем историю заказа по убыванию времени
+        }
+        if ($operationHistory) {
+            usort($operationHistory, function ($a, $b) {
+                return $b['time'] - $a['time'];
+            }); // Отсортируем историю отправления по убыванию времени
+        }
         $lastHistoryTime = 0;
         if ($orderHistory) {
             $lastHistoryTime = strtotime($orderHistory[0]->post_date);
@@ -413,9 +428,11 @@ class TrackCommand extends Command
         if ($lastStatusId != $order->status_id) {
             $result['statusId'] = $lastStatusId;
         }
-        usort($result['history'], function ($a, $b) {
-            return strtotime($a->post_date) - strtotime($b->post_date);
-        });
+        if ($result['history']) {
+            usort($result['history'], function ($a, $b) {
+                return strtotime($a->post_date) - strtotime($b->post_date);
+            });
+        }
         // Отсортируем новые сообщения в истории по возрастанию времени,
         // чтобы последовательность ID# соответствовала времени
         return $result;
