@@ -49,18 +49,19 @@ class TrackingAPI
             static::URL_PREFIX . 'rtm34?wsdl',
             ['trace' => 1, 'soap_version' => SOAP_1_2]
         );
+        $soapData = [
+            'OperationHistoryRequest' => [
+                'Barcode' => $barcode,
+                'MessageType' => '0',
+                'Language' => 'RUS'
+            ],
+            'AuthorizationHeader' => [
+                'login'=> $this->login,
+                'password' => $this->password
+            ]
+        ];
         $result = $soap->getOperationHistory(
-            new SoapParam([
-                'OperationHistoryRequest' => [
-                    'Barcode' => $barcode,
-                    'MessageType' => '0',
-                    'Language' => 'RUS'
-                ],
-                'AuthorizationHeader' => [
-                    'login'=> $this->login,
-                    'password' => $this->password
-                ]
-            ], 'request')
+            new SoapParam($soapData, 'request')
         );
         return $result;
     }
