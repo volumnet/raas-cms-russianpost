@@ -403,14 +403,14 @@ class TrackCommand extends Command
                 $operationHistoryEntry['status_id'],
                 $orderHistory
             );
-            if (!$orderHistoryEntry['current']) {
+            if (!$orderHistoryEntryData['current']) {
                 $newOrderHistoryEntry = new Order_History([
                     'uid' => 0,
                     'order_id' => (int)$order->id,
                     'status_id' => $operationHistoryEntry['status_id'],
                     'paid' => (
-                        $orderHistoryEntry ?
-                        (int)$orderHistoryEntry['entry']->paid :
+                        $orderHistoryEntryData ?
+                        (int)$orderHistoryEntryData['entry']->paid :
                         0
                     ),
                     'post_date' => $operationHistoryEntry['post_date'],
