@@ -7,6 +7,8 @@ namespace RAAS\CMS\RussianPost;
 use Exception;
 use SOME\Text;
 use RAAS\Application;
+use RAAS\CMS\Material;
+use RAAS\CMS\Shop\Cart;
 use RAAS\CMS\Shop\Order;
 use RAAS\CMS\Shop\Order_History;
 
@@ -78,16 +80,25 @@ class Sender
      * @var array
      */
     public $predefinedData = [
-        'courier' => false,
-        'fragile' => false,
+        'completeness-checking' => false, // Признак услуги проверки комплектности
+        'contents-checking' => true, // Признак услуги проверки вложения
+        'courier' => false, // Отметка "Курьер"
+        'entries-type' => 'GIFT', // Категория вложения
+        'fragile' => false, // Отметка "Осторожно/Хрупко"
+        'index-from' => null, // Почтовый индекс объекта почтовой связи места приема
+        'inventory' => true, // Опись вложения
+        'mail-category' => 'WITH_DECLARED_VALUE',
         'mail-direct' => 643, // Россия
-        'mail-type' => 'POSTAL_PARCEL',
+        'mail-type' => 'POSTAL_PARCEL', // Категория РПО
         'manual-address-input' => false,
-        'payment-method' => 'CASHLESS',
-        'with-order-of-notice' => false,
-        'with-simple-notice' => false,
-        'transport-type' => 'COMBINED',
-        'completeness-checking' => false,
+        'notice-payment-method' => 'CASHLESS', // Способ оплаты уведомеления
+        'payment-method' => 'CASHLESS', // Способ оплаты
+        'sms-notice-recipient' => 0, // Признак услуги SMS уведомления
+        'transport-type' => 'COMBINED', // Вид транспортировки
+        'vsd' => true, // Возврат сопроводительныйх документов
+        'with-electronic-notice' => true, // Отметка 'С электронным уведомлением'
+        'with-order-of-notice' => false, // Отметка 'С заказным уведомлением'
+        'with-simple-notice' => false, // Отметка 'С простым уведомлением'
     ];
 
 
@@ -163,12 +174,6 @@ class Sender
     public $itemWeightVar = 'weight';
 
     /**
-     * Переменная трек-номера заказа
-     * @var string
-     */
-    public $barcodeVar = 'barcode';
-
-    /**
      * Множитель веса
      * @var float
      */
@@ -187,10 +192,112 @@ class Sender
     public $defaultWeight = 1;
 
     /**
+     * Переменная длины заказа
+     * @var string
+     */
+    public $lengthVar = 'length';
+
+    /**
+     * Переменная длины товара
+     * @var string
+     */
+    public $itemLengthVar = 'length';
+
+    /**
+     * Множитель длины
+     * @var float
+     */
+    public $lengthRatio = 1;
+
+    /**
+     * Длина товара по умолчанию, см
+     * @var float
+     */
+    public $defaultItemLength = 10;
+
+    /**
+     * Длина заказа по умолчанию, см
+     * @var float
+     */
+    public $defaultLength = 20;
+
+    /**
+     * Переменная ширины заказа
+     * @var string
+     */
+    public $widthVar = 'width';
+
+    /**
+     * Переменная ширины товара
+     * @var string
+     */
+    public $itemWidthVar = 'width';
+
+    /**
+     * Множитель ширины
+     * @var float
+     */
+    public $widthRatio = 1;
+
+    /**
+     * Ширина товара по умолчанию, см
+     * @var float
+     */
+    public $defaultItemWidth = 10;
+
+    /**
+     * Ширина заказа по умолчанию, см
+     * @var float
+     */
+    public $defaultWidth = 20;
+
+    /**
+     * Переменная высоты заказа
+     * @var string
+     */
+    public $heightVar = 'height';
+
+    /**
+     * Переменная высоты товара
+     * @var string
+     */
+    public $itemHeightVar = 'height';
+
+    /**
+     * Множитель высоты
+     * @var float
+     */
+    public $heightRatio = 1;
+
+    /**
+     * Высота товара по умолчанию, см
+     * @var float
+     */
+    public $defaultItemHeight = 10;
+
+    /**
+     * Высота заказа по умолчанию, см
+     * @var float
+     */
+    public $defaultHeight = 20;
+
+    /**
+     * Переменная трек-номера заказа
+     * @var string
+     */
+    public $barcodeVar = 'barcode';
+
+    /**
      * Статус "Отправлен Почтой России"
      * @var int
      */
     public $sentStatusId = 0;
+
+    /**
+     * Стоимость доставки по умолчанию, руб.
+     * @var int
+     */
+    public $defaultDeliveryPrice = 200;
 
     /**
      * Экземпляр API отправки
@@ -220,6 +327,23 @@ class Sender
         $arr = [];
         foreach ($this->addressComponents as $key) {
             if ($val = trim($order->$key)) {
+                $arr[] = $val;
+            }
+        }
+        return implode(', ', $arr);
+    }
+
+
+    /**
+     * Получить строку адреса у корзины
+     * @param array $postData POST-данные
+     * @return string
+     */
+    public function stringifyCartAddress(array $postData = [])
+    {
+        $arr = [];
+        foreach ($this->addressComponents as $key) {
+            if ($val = trim($postData[$key])) {
                 $arr[] = $val;
             }
         }
@@ -273,6 +397,39 @@ class Sender
 
 
     /**
+     * Нормализация адрес корзины
+     * @param array $postData POST-данные
+     * @return array [Нормализованный адрес]
+     */
+    public function normalizeCartAddress(array $postData = [])
+    {
+        $stringifiedAddress = $this->stringifyCartAddress($postData);
+        $addresses = [trim($stringifiedAddress)];
+
+        $normalizedAddresses = [];
+        try {
+            $normalizedAddresses = $this->api->normalizeAddresses($addresses);
+        } catch (Exception $e) {
+        }
+        $result = [];
+        $result = array_shift(array_values($normalizedAddresses));
+        $result['stringifiedAddress'] = $stringifiedAddress;
+        $result['isCorrect'] = (
+            in_array(
+                $result['quality-code'],
+                ['GOOD', 'POSTAL_BOX', 'ON_DEMAND', 'UNDEF_05']
+            ) && in_array(
+                $result['validation-code'],
+                ['VALIDATED', 'OVERRIDDEN', 'CONFIRMED_MANUALLY']
+            ) && (
+                trim($result['index']) == trim($postData[$this->postCodeVar])
+            )
+        );
+        return $result;
+    }
+
+
+    /**
      * Функция расчета веса
      * @param Order $order Заказ
      * @return float Вес в кг
@@ -300,6 +457,121 @@ class Sender
 
 
     /**
+     * Функция расчета размера
+     * @param Order $order Заказ
+     * @param 'string' $var <pre>'width'|'lehgth'|'height'</pre> Измерение
+     * @return array int Измерение в см
+     */
+    public function getDimension(Order $order, $var)
+    {
+        $result = 0;
+
+        $sizeVar = $this->{$var . 'Var'};
+        $itemSizeVar = $this->{'item' . ucfirst($var) . 'Var'};
+        $defaultItemSize = $this->{'defaultItem' . ucfirst($var)};
+        $defaultSize = $this->{'default' . ucfirst($var)};
+        $sizeRatio = $this->{$var . 'Ratio'};
+
+        if ($orderSize = $order->{$sizeVar}) {
+            $result = $orderSize;
+        } else {
+            if (count($order->items) == 1) {
+                $item = $order->items[0];
+                if (!($size = (int)$item->{$itemSizeVar})) {
+                    $size = (int)$defaultItemSize;
+                }
+                $result = $size;
+            }
+            if (!$result) {
+                $result = $defaultSize;
+            }
+        }
+        $result *= $sizeRatio;
+        return $result;
+    }
+
+
+    /**
+     * Функция расчета веса корзины
+     * @return float Вес в кг
+     */
+    public function getCartWeight(Cart $cart)
+    {
+        $result = 0;
+
+        foreach ($cart->items as $cartItem) {
+            $item = new Material($cartItem->id);
+            if (!($weight = (float)$item->{$this->itemWeightVar})) {
+                $weight = (float)$this->defaultItemWeight;
+            }
+            $result += ($weight * $item->amount);
+        }
+        if (!$result) {
+            $result = $this->defaultWeight;
+        }
+        $result *= $this->weightRatio;
+        return $result;
+    }
+
+
+    /**
+     * Функция расчета размера из корзины
+     * @param Cart $cart Заказ
+     * @param 'string' $var <pre>'width'|'lehgth'|'height'</pre> Измерение
+     * @return array int Измерение в см
+     */
+    public function getCartDimension(Cart $cart, $var)
+    {
+        $result = 0;
+
+        $sizeVar = $this->{$var . 'Var'};
+        $itemSizeVar = $this->{'item' . ucfirst($var) . 'Var'};
+        $defaultItemSize = $this->{'defaultItem' . ucfirst($var)};
+        $defaultSize = $this->{'default' . ucfirst($var)};
+        $sizeRatio = $this->{$var . 'Ratio'};
+
+        if (count($cart->items) == 1) {
+            $cartItem = $cart->items[0];
+            $item = new Material($cartItem->id);
+            if (!($size = (int)$item->{$itemSizeVar})) {
+                $size = (int)$defaultItemSize;
+            }
+            $result = $size;
+        }
+        if (!$result) {
+            $result = $defaultSize;
+        }
+        $result *= $sizeRatio;
+        return $result;
+    }
+
+
+    /**
+     * Расчет типоразмера
+     * @param int $x Длина
+     * @param int $y Ширина
+     * @param int $z Высота
+     * @return string <pre>'S'|'M'|'L'|'XL'|'OVERSIZED'</pre>
+     */
+    public function getDimensionType($x, $y, $z)
+    {
+        $sizes = [(int)$x, (int)$y, (int)$z];
+        sort($sizes);
+        list($x, $y, $z) = $sizes;
+        if (($x <= 260) && ($y <= 170) && ($z <= 80)) {
+            return 'S';
+        } elseif (($x <= 300) && ($y <= 200) && ($z <= 150)) {
+            return 'M';
+        } elseif (($x <= 400) && ($y <= 270) && ($z <= 180)) {
+            return 'L';
+        } elseif (($x <= 530) && ($y <= 260) && ($z <= 220)) {
+            return 'XL';
+        }
+        return 'OVERSIZED';
+    }
+
+
+    /**
      * Формирует данные для регистрации заказа в сервисе отправки Почты России
      * @param Order $order Заказ
      * @param array $normalizedAddress <pre>[Нормализованный адрес]</pre>
@@ -320,7 +592,22 @@ class Sender
         $recipientFullName = trim(implode(' ', $recipientNameArr));
         $weight = $this->getWeight($order);
 
-        $result = array_merge($this->predefinedData, [
+        $predefinedData = array_intersect_key(
+            $this->predefinedData,
+            array_flip([
+                'completeness-checking',
+                'courier',
+                'fragile',
+                'mail-direct',
+                'mail-type',
+                'manual-address-input',
+                'payment-method',
+                'transport-type',
+                'with-order-of-notice',
+                'with-simple-notice',
+            ])
+        );
+        $result = array_merge($predefinedData, [
             'comment' => trim($order->id),
             'given-name' => trim($order->{$this->firstNameVar}),
             'mass' => ceil($weight * 1000),
@@ -483,5 +770,68 @@ class Sender
                 }
             }
         }
+    }
+
+
+    /**
+     * Рассчитывает стоимость доставки корзины
+     * @param Cart $cart Корзина для расчета
+     * @param array $postData POST-данные для расчета
+     * @return float Стоимость, руб.
+     */
+    public function calculateCart(Cart $cart, $postData = [])
+    {
+        $predefinedData = array_intersect_key(
+            $this->predefinedData,
+            array_flip([
+                'completeness-checking',
+                'contents-checking',
+                'courier',
+                'entries-type',
+                'fragile',
+                'index-from',
+                'inventory',
+                'mail-category',
+                'mail-direct',
+                'mail-type',
+                'notice-payment-method',
+                'payment-method',
+                'sms-notice-recipient',
+                'transport-type',
+                'vsd',
+                'with-electronic-notice',
+                'with-order-of-notice',
+                'with-simple-notice',
+            ])
+        );
+
+        $weight = $this->getCartWeight($cart);
+        $data = $predefinedData;
+        if (!$data['index-from']) {
+            unset($data['index-from']);
+        }
+        $data['mass'] = ceil($weight * 1000);
+        foreach (['length', 'width', 'height'] as $key) {
+            $data['dimension'][$key] = $this->getCartDimension($cart, $key);
+        }
+        $data['dimension-type'] = $this->getDimensionType(
+            $data['dimension']['length'],
+            $data['dimension']['width'],
+            $data['dimension']['height']
+        );
+        $data['declared-value'] = $cart->sum;
+        $normalizedAddress = $this->normalizeCartAddress($postData);
+        $data['index-to'] = $normalizedAddress['index'];
+        $result = (int)$this->defaultDeliveryPrice;
+        // var_dump($data); exit;
+        try {
+            $rawResult = $this->api->method('tariff', $data, 'POST');
+            // var_dump($rawResult); exit;
+            if ($rawResult['total-rate']) {
+                $result = ceil($rawResult['total-rate'] / 100);
+            }
+        } catch (Exception $e) {
+        }
+        return $result;
     }
 }
