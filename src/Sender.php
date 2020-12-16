@@ -804,6 +804,7 @@ class Sender
                 'with-simple-notice',
             ])
         );
+        // var_dump($predefinedData); exit;
 
         $weight = $this->getCartWeight($cart);
         $data = $predefinedData;
@@ -822,16 +823,27 @@ class Sender
         $data['declared-value'] = $cart->sum;
         $normalizedAddress = $this->normalizeCartAddress($postData);
         $data['index-to'] = $normalizedAddress['index'];
-        $result = (int)$this->defaultDeliveryPrice;
-        // var_dump($data); exit;
+
+        $sum = (int)$this->defaultDeliveryPrice;
+        $minDays = $maxDays = null;
         try {
             $rawResult = $this->api->method('tariff', $data, 'POST');
-            // var_dump($rawResult); exit;
             if ($rawResult['total-rate']) {
-                $result = ceil($rawResult['total-rate'] / 100);
+                $sum = ceil($rawResult['total-rate'] / 100);
+            }
+            if ($rawResult['delivery-time']['min-days']) {
+                $minDays = $rawResult['delivery-time']['min-days'];
+            }
+            if ($rawResult['delivery-time']['max-days']) {
+                $maxDays = $rawResult['delivery-time']['max-days'];
             }
         } catch (Exception $e) {
         }
+        $result = [
+            'sum' => $sum,
+            'minDays' => $minDays,
+            'maxDays' => $maxDays,
+        ];
         return $result;
     }
 }

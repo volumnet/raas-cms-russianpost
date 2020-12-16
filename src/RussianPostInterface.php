@@ -89,18 +89,33 @@ class RussianPostInterface extends AbstractInterface
         $cart = new Cart($cartType, $user);
 
         $sender = new Sender($this->login, $this->password, $this->token);
-        foreach ($this->senderParams as $key => $val) {
-            if (is_array($sender->$key) && is_array($val)) {
+        foreach ((array)$this->senderParams as $key => $val) {
+            if (is_array($sender->$key) &&
+                is_array($val) &&
+                (array_values(array_keys($sender->$key)) != array_keys($sender->$key)) && // Ассоциативный массив
+                (array_values(array_keys($val)) != array_keys($val)) // Ассоциативный массив
+            ) {
                 $sender->$key = array_merge($sender->$key, $val);
             } else {
                 $sender->$key = $val;
             }
         }
         $cartSum = (float)$cart->sum;
-        $deliveryPrice = (float)$sender->calculateCart($cart, $post);
+        $deliveryPriceData = $sender->calculateCart($cart, $post);
+        $deliveryPrice = (float)$deliveryPriceData['sum'];
 
-        $sum = $deliveryPrice + ($cartSum + $deliveryPrice) * ($this->priceRatio - 1);
+        if ($deliveryPrice) {
+            $sum = $deliveryPrice + ($cartSum + $deliveryPrice) * ($this->priceRatio - 1);
+        } else {
+            $sum = 0;
+        }
         $result = ['result' => $sum];
+        if ((int)$deliveryPriceData['minDays']) {
+            $result['minDays'] = (int)$deliveryPriceData['minDays'];
+        }
+        if ((int)$deliveryPriceData['maxDays']) {
+            $result['maxDays'] = (int)$deliveryPriceData['maxDays'];
+        }
         return $result;
     }
 }

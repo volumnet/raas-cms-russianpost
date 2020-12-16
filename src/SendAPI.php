@@ -108,6 +108,16 @@ class SendAPI
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
+        // if ($method == 'tariff') {
+        //     print_r([
+        //         'Content-Type: application/json',
+        //         'Accept: application/json;charset=UTF-8',
+        //         'Authorization: AccessToken ' . $this->token,
+        //         'X-User-Authorization: Basic ' . $this->userKey
+        //     ]);
+        //     print_r (json_encode($data, JSON_PRETTY_PRINT));
+        //     exit;
+        // }
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Content-Type: application/json',
             'Accept: application/json;charset=UTF-8',

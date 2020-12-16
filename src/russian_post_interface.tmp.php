@@ -21,5 +21,7 @@ $interface = new RussianPostInterface(
 $interface->login = $GLOBALS['pochta']['login'];
 $interface->password = $GLOBALS['pochta']['password'];
 $interface->token = $GLOBALS['pochta']['token'];
+$interface->senderParams = $GLOBALS['pochta']['sender'];
+$interface->priceRatio = (float)$GLOBALS['pochta']['priceRatio'];
 
 return $interface->process();
