@@ -108,7 +108,8 @@ class SendAPI
 
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $url);
-        // if ($method == 'tariff') {
+        // if ($method == /*'tariff'*/'clean/address') {
+        //     print_r ($url);
         //     print_r([
         //         'Content-Type: application/json',
         //         'Accept: application/json;charset=UTF-8',
@@ -118,6 +119,7 @@ class SendAPI
         //     print_r (json_encode($data, JSON_PRETTY_PRINT));
         //     exit;
         // }
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
             'Content-Type: application/json',
             'Accept: application/json;charset=UTF-8',
@@ -134,6 +136,7 @@ class SendAPI
         }
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         $text = curl_exec($ch);
+        // var_dump(curl_error($ch)); exit;
         $data = (array)json_decode($text, true);
         return $data;
     }
@@ -155,6 +158,7 @@ class SendAPI
         if ($result['error']) {
             throw new Exception($result['error'], $result['status']);
         }
+        // var_dump($result); exit;
         return $result;
     }
 
