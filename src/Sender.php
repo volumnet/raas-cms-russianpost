@@ -738,35 +738,35 @@ class Sender
             }
         }
 
-        if ($this->sentStatusId) {
-            if ($result['result-ids']) {
-                foreach ($result['result-ids'] as $i => $resultId) {
-                    $trackIdData = $this->api->method(
-                        'backlog/' . $resultId,
-                        [],
-                        false
-                    );
-                    $barcode = $trackIdData['barcode'];
-                    $order = $ordersSucceeded[$i];
-                    $history = new Order_History([
-                        'uid' => (int)Application::i()->user->id,
-                        'order_id' => (int)$order->id,
-                        'status_id' => (int)$this->sentStatusId,
-                        'paid' => $order->paid,
-                        'post_date' => date('Y-m-d H:i:s'),
-                        'description' => 'Передан в Почту России с ID# ' . $resultId
-                                      . ($barcode . ', трек-номер ' . $barcode),
-                    ]);
-                    $history->commit();
+        if ($result['result-ids']) {
+            foreach ($result['result-ids'] as $i => $resultId) {
+                $trackIdData = $this->api->method(
+                    'backlog/' . $resultId,
+                    [],
+                    false
+                );
+                $barcode = $trackIdData['barcode'];
+                $order = $ordersSucceeded[$i];
+                $history = new Order_History([
+                    'uid' => (int)Application::i()->user->id,
+                    'order_id' => (int)$order->id,
+                    'status_id' => (int)($this->sentStatusId ?: $order->status_id),
+                    'paid' => $order->paid,
+                    'post_date' => date('Y-m-d H:i:s'),
+                    'description' => 'Передан в Почту России с ID# ' . $resultId
+                                  . ($barcode . ', трек-номер ' . $barcode),
+                ]);
+                $history->commit();
+                if ($this->sentStatusId) {
                     $order->status_id = (int)$this->sentStatusId;
                     $order->commit();
-                    $order->russianPostId = $resultId;
-                    if ($barcode &&
-                        ($barcodeField = $order->fields[$this->barcodeVar])
-                    ) {
-                        $barcodeField->deleteValues();
-                        $barcodeField->addValue($barcode);
-                    }
+                }
+                $order->russianPostId = $resultId;
+                if ($barcode &&
+                    ($barcodeField = $order->fields[$this->barcodeVar])
+                ) {
+                    $barcodeField->deleteValues();
+                    $barcodeField->addValue($barcode);
                 }
             }
         }
