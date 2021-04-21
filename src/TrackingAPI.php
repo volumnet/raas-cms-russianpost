@@ -45,10 +45,18 @@ class TrackingAPI
      */
     public function getOperationHistory($barcode)
     {
-        $soap = new SoapClient(
-            static::URL_PREFIX . 'rtm34?wsdl',
-            ['trace' => 1, 'soap_version' => SOAP_1_2]
-        );
+        $context = stream_context_create([
+            'ssl' => [
+                'verify_peer' => false,
+                'verify_peer_name' => false,
+                'allow_self_signed' => true
+            ]
+        ]);
+        $soap = new SoapClient(static::URL_PREFIX . 'rtm34?wsdl', [
+            'trace' => 1,
+            'soap_version' => SOAP_1_2,
+            'stream_context' => $context
+        ]);
         $soapData = [
             'OperationHistoryRequest' => [
                 'Barcode' => $barcode,
