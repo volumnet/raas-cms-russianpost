@@ -197,6 +197,18 @@ class TrackCommand extends Command
             // Проверяем также по истории, потому что после получения финального
             // статуса, администратор может сменить статус вручную
         }
+        if ($this->config['deliveryTypeFieldId'] && $this->config['deliveryTypeValues']) {
+            $deliveryTypeValues = array_map(function ($x) {
+                return "'" . Order::_SQL()->real_escape_string($x) . "'";
+            }, (array)$this->config['deliveryTypeValues']);
+            $sqlQuery .= " AND (
+                                SELECT COUNT(*)
+                                  FROM cms_data
+                                 WHERE fid = " . (int)$this->config['deliveryTypeFieldId'] . "
+                                   AND pid = tOr.id
+                                   AND value IN (" . implode(", ", $deliveryTypeValues) . ")
+                             )";
+        }
         $sqlQuery .= " ORDER BY tOr.id";
         $result = Order::getSQLSet($sqlQuery);
 
